@@ -63,6 +63,42 @@ npm start
 - **מנהל:** admin / admin123
 - **משתמשי חדר:** room1 / room123, room2 / room123, וכו'
 
+## 🌐 Deployment
+
+### Render (מומלץ)
+הפרויקט מוכן ל-deployment על Render:
+
+1. **צור חשבון ב-Render** - https://render.com
+2. **חבר את ה-GitHub repository**
+3. **בחר "Web Service"**
+4. **הגדר את הפרמטרים:**
+   - **Build Command:** `npm install`
+   - **Start Command:** `node server.js`
+   - **Environment Variables:**
+     - `NODE_ENV=production`
+     - `SESSION_SECRET=your-secret-key`
+
+### Heroku
+```bash
+# התקן Heroku CLI
+heroku create your-app-name
+git push heroku main
+```
+
+### VPS/Server
+```bash
+# העתק את הקבצים לשרת
+scp -r . user@your-server:/path/to/app
+
+# התקן Node.js ו-npm
+sudo apt update
+sudo apt install nodejs npm
+
+# הפעל את האפליקציה
+npm install
+npm start
+```
+
 ## 🛠️ טכנולוגיות
 
 ### Backend
