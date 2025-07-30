@@ -14,6 +14,54 @@ function isAuthenticated(req, res, next) {
   }
 }
 
+// Setup route - יצירת מנהל ראשון
+router.get('/admin/setup', async (req, res) => {
+  try {
+    const usersCount = await User.count();
+    if (usersCount > 0) {
+      return res.redirect('/login'); // אם כבר יש משתמשים, מפנה להתחברות
+    }
+    res.render('setup', { errorMessage: null });
+  } catch (error) {
+    console.error('Error loading setup page:', error);
+    res.status(500).send('Error loading setup page');
+  }
+});
+
+router.post('/admin/setup', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    // בדוק אם כבר יש משתמשים
+    const usersCount = await User.count();
+    if (usersCount > 0) {
+      return res.render('setup', { errorMessage: 'Admin user already exists' });
+    }
+
+    // בדוק אם המשתמש כבר קיים
+    const existingUser = await User.findOne({ where: { username } });
+    if (existingUser) {
+      return res.render('setup', { errorMessage: 'Username already exists' });
+    }
+
+    // צור סיסמה מוצפנת
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // צור משתמש מנהל חדש
+    await User.create({
+      username,
+      password: hashedPassword,
+      room: 'admin_room',
+      isAdmin: true
+    });
+
+    res.redirect('/login?message=Admin created successfully');
+  } catch (error) {
+    console.error('Error creating admin user:', error);
+    res.render('setup', { errorMessage: 'Error creating admin user' });
+  }
+});
+
 // דף הפאנל לניהול משתמשים, חדרים וחדשות
 router.get('/admin', isAuthenticated, async (req, res) => {
   try {
