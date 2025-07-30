@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מערכת ניהול תורים - מסך תצוגה</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="kiosk-mode">
+    <!-- Kiosk Header -->
+    <header class="kiosk-header">
+        <div class="kiosk-header-content">
+            <div class="kiosk-logo">
+                <i class="fas fa-hospital"></i>
+                <span>מערכת ניהול תורים</span>
+            </div>
+            <div class="kiosk-time">
+                <div id="current-time" class="time-display"></div>
+                <div id="current-date" class="date-display"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Kiosk Content -->
+    <main class="kiosk-main">
+        <!-- News Ticker -->
+        <% if (news && news.length > 0) { %>
+        <div class="news-ticker-container">
+            <div class="news-ticker">
+                <div class="ticker-icon">
+                    <i class="fas fa-bullhorn"></i>
+                </div>
+                <div class="ticker-content">
+                    <div class="ticker-wrapper">
+                        <div id="ticker-text" class="ticker-text"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <% } %>
+
+        <!-- Rooms Display -->
+        <div class="rooms-display">
+            <div id="rooms-container" class="rooms-grid">
+                <!-- Rooms will be loaded dynamically -->
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="loading-container">
+            <div class="loading-spinner"></div>
+            <p>טוען נתונים...</p>
+        </div>
+    </main>
+
+    <!-- Audio Context Button (Hidden but accessible) -->
+    <button id="enableAudioBtn" class="audio-enable-btn" onclick="enableAudio()">
+        <i class="fas fa-volume-up"></i>
+    </button>
+
+    <script>
+        // Global variables
+        let startIndex = {};
+        let audioContext = null;
+        let lastNotificationTime = 0;
+        let currentNewsIndex = 0;
+        let newsItems = [];
+
+        // Initialize audio context
+        function enableAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                console.log('Audio context enabled');
+                document.getElementById('enableAudioBtn').style.display = 'none';
+            }
+        }
+
+        // Update time and date
+        function updateDateTime() {
+            const now = new Date();
+            const timeElement = document.getElementById('current-time');
+            const dateElement = document.getElementById('current-date');
+            
+            if (timeElement) {
+                timeElement.textContent = now.toLocaleTimeString('he-IL', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+            }
+            
+            if (dateElement) {
+                dateElement.textContent = now.toLocaleDateString('he-IL', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            }
+        }
+
+        // Initialize news ticker
+        function initNewsTicker() {
+            const tickerText = document.getElementById('ticker-text');
+            if (!tickerText) return;
+
+            // Get news items from the page
+            const newsElements = document.querySelectorAll('.news-item');
+            newsItems = Array.from(newsElements).map(el => ({
+                title: el.querySelector('strong')?.textContent || '',
+                content: el.querySelector('span')?.textContent || ''
+            }));
+
+            if (newsItems.length === 0) return;
+
+            function updateTicker() {
+                const item = newsItems[currentNewsIndex];
+                const text = `<span class="ticker-title">${item.title}</span> - <span class="ticker-content-text">${item.content}</span>`;
+                tickerText.innerHTML = text;
+                
+                currentNewsIndex = (currentNewsIndex + 1) % newsItems.length;
+            }
+
+            updateTicker();
+            setInterval(updateTicker, 8000); // Change every 8 seconds
+        }
+
+        // Play notification sound
+        function playNotificationSound() {
+            if (!audioContext) return;
+            
+            const now = Date.now();
+            if (now - lastNotificationTime < 1000) return;
+            
+            lastNotificationTime = now;
+            
+            try {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.3);
+            } catch (error) {
+                console.error('Error playing notification sound:', error);
+            }
+        }
+
+        // Update room display
+        function updateRoom(room) {
+            const listElement = document.getElementById(`waiting-list-${room.name}`);
+            const waitingList = room.waitingList;
+
+            if (!startIndex[room.name]) {
+                startIndex[room.name] = 0;
+            }
+
+            listElement.innerHTML = '';
+
+            const endIndex = Math.min(startIndex[room.name] + 5, waitingList.length);
+            for (let i = startIndex[room.name]; i < endIndex; i++) {
+                const listItem = document.createElement('li');
+                listItem.className = 'kiosk-patient-item';
+                listItem.innerHTML = `
+                    <span class="kiosk-patient-number">${waitingList[i].patientNumber}</span>
+                `;
+                listElement.appendChild(listItem);
+            }
+
+            startIndex[room.name] = endIndex < waitingList.length ? endIndex : 0;
+        }
+
+        // Fetch room data
+        function fetchRoomData() {
+            fetch('/rooms/data')
+                .then(response => response.json())
+                .then(rooms => {
+                    const roomsContainer = document.getElementById('rooms-container');
+                    const loadingElement = document.getElementById('loading');
+                    
+                    roomsContainer.innerHTML = '';
+                    loadingElement.style.display = 'none';
+
+                    rooms.forEach((room, index) => {
+                        const roomElement = document.createElement('div');
+                        roomElement.className = 'kiosk-room-card';
+                        roomElement.style.animationDelay = `${index * 0.2}s`;
+
+                        roomElement.innerHTML = `
+                            <div class="kiosk-room-header">
+                                <h2 class="kiosk-room-name">
+                                    <i class="fas fa-door-open"></i>
+                                    ${room.name}
+                                </h2>
+                                <div class="kiosk-room-status">
+                                    <span class="kiosk-status-badge ${room.currentPatient ? 'active' : 'waiting'}">
+                                        ${room.currentPatient ? 'פעיל' : 'ממתין'}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div class="kiosk-current-patient">
+                                ${room.currentPatient ? 
+                                    `<div class="kiosk-current-display">
+                                        <div class="kiosk-current-label">מטופל נוכחי</div>
+                                        <div class="kiosk-current-number">${room.currentPatient}</div>
+                                    </div>` : 
+                                    `<div class="kiosk-no-patient">
+                                        <i class="fas fa-info-circle"></i>
+                                        אין מטופל בטיפול
+                                    </div>`
+                                }
+                            </div>
+                            
+                            <div class="kiosk-waiting-section">
+                                <div class="kiosk-waiting-label">הבאים בתור</div>
+                                <ul id="waiting-list-${room.name}" class="kiosk-waiting-list">
+                                    ${room.waitingList.slice(0, 5).map(patient => `
+                                        <li class="kiosk-patient-item">
+                                            <span class="kiosk-patient-number">${patient.patientNumber}</span>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+                        `;
+
+                        roomsContainer.appendChild(roomElement);
+
+                        if (room.waitingList.length > 0) {
+                            startIndex[room.name] = 0;
+                        }
+                    });
+
+                    // Start ticker animation for rooms with waiting lists
+                    rooms.forEach(room => {
+                        if (room.waitingList.length > 5) {
+                            setInterval(() => updateRoom(room), 4000);
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching room data:', error);
+                });
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Update time every second
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+            
+            // Initialize news ticker
+            setTimeout(initNewsTicker, 1000);
+            
+            // Initial data fetch
+            fetchRoomData();
+            
+            // Refresh data every 15 seconds
+            setInterval(fetchRoomData, 15000);
+            
+            // Enable audio on first click
+            document.addEventListener('click', enableAudio, { once: true });
+        });
+
+        // Fullscreen mode for kiosk
+        function enterFullscreen() {
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen();
+            } else if (document.documentElement.webkitRequestFullscreen) {
+                document.documentElement.webkitRequestFullscreen();
+            } else if (document.documentElement.msRequestFullscreen) {
+                document.documentElement.msRequestFullscreen();
+            }
+        }
+
+        // Auto-enter fullscreen after 2 seconds
+        setTimeout(enterFullscreen, 2000);
+    </script>
+
+    <style>
+        /* Kiosk-specific styles */
+        .kiosk-mode {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: white;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .kiosk-header {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 2px solid #6366f1;
+            padding: 1rem 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+
+        .kiosk-header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .kiosk-logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #6366f1;
+        }
+
+        .kiosk-logo i {
+            font-size: 2rem;
+        }
+
+        .kiosk-time {
+            text-align: center;
+        }
+
+        .time-display {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #10b981;
+            font-family: 'Courier New', monospace;
+        }
+
+        .date-display {
+            font-size: 1rem;
+            color: #cbd5e1;
+            margin-top: 0.25rem;
+        }
+
+        .kiosk-main {
+            padding-top: 100px;
+            height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+
+        .news-ticker-container {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid #6366f1;
+            margin: 1rem 2rem;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+
+        .news-ticker {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            background: linear-gradient(90deg, rgba(99, 102, 241, 0.2), transparent);
+        }
+
+        .ticker-icon {
+            font-size: 1.5rem;
+            color: #6366f1;
+            margin-left: 1rem;
+        }
+
+        .ticker-content {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .ticker-wrapper {
+            display: flex;
+            align-items: center;
+            height: 100%;
+        }
+
+        .ticker-text {
+            font-size: 1.25rem;
+            font-weight: 500;
+            white-space: nowrap;
+            animation: ticker-scroll 20s linear infinite;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .ticker-title {
+            color: #6366f1;
+            font-weight: 700;
+            background: rgba(99, 102, 241, 0.1);
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+
+        .ticker-content-text {
+            color: white;
+            font-weight: 400;
+        }
+
+        @keyframes ticker-scroll {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+
+        .rooms-display {
+            padding: 1rem 2rem;
+        }
+
+        .rooms-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .kiosk-room-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 1rem;
+            padding: 2rem;
+            transition: all 0.3s ease;
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        .kiosk-room-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .kiosk-room-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .kiosk-room-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .kiosk-room-name i {
+            color: #6366f1;
+        }
+
+        .kiosk-status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .kiosk-status-badge.active {
+            background: rgba(34, 197, 94, 0.2);
+            color: #10b981;
+            border: 1px solid #10b981;
+        }
+
+        .kiosk-status-badge.waiting {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+            border: 1px solid #f59e0b;
+        }
+
+        .kiosk-current-patient {
+            margin-bottom: 2rem;
+        }
+
+        .kiosk-current-display {
+            text-align: center;
+            padding: 1.5rem;
+            background: rgba(34, 197, 94, 0.1);
+            border: 2px solid #10b981;
+            border-radius: 1rem;
+        }
+
+        .kiosk-current-label {
+            font-size: 1rem;
+            color: #cbd5e1;
+            margin-bottom: 0.5rem;
+        }
+
+        .kiosk-current-number {
+            font-size: 3rem;
+            font-weight: 700;
+            color: #10b981;
+            font-family: 'Courier New', monospace;
+        }
+
+        .kiosk-no-patient {
+            text-align: center;
+            padding: 1.5rem;
+            color: #cbd5e1;
+            font-style: italic;
+        }
+
+        .kiosk-no-patient i {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .kiosk-waiting-section {
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            padding-top: 1.5rem;
+        }
+
+        .kiosk-waiting-label {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #cbd5e1;
+            margin-bottom: 1rem;
+        }
+
+        .kiosk-waiting-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .kiosk-patient-item {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .kiosk-patient-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        .kiosk-patient-number {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #6366f1;
+            font-family: 'Courier New', monospace;
+        }
+
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 50vh;
+            color: #cbd5e1;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #6366f1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+
+        .audio-enable-btn {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: rgba(99, 102, 241, 0.8);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .audio-enable-btn:hover {
+            background: rgba(99, 102, 241, 1);
+            transform: scale(1.1);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive design for kiosk */
+        @media (max-width: 1200px) {
+            .rooms-grid {
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            }
+        }
+
+        @media (max-width: 768px) {
+            .kiosk-header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .time-display {
+                font-size: 1.5rem;
+            }
+
+            .rooms-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+
+            .kiosk-room-card {
+                padding: 1.5rem;
+            }
+
+            .kiosk-current-number {
+                font-size: 2rem;
+            }
+        }
+
+        /* Hide scrollbars for kiosk */
+        .kiosk-main::-webkit-scrollbar {
+            display: none;
+        }
+
+        .kiosk-main {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</body>
+</html>

@@ -1,0 +1,8 @@
+מסך ראשי
+http://localhost:3000/overview
+מסך ניהול חדר
+http://localhost:3000/room
+קבלת מטופל
+http://localhost:3000/checkin
+ניהול
+http://localhost:3000/admin

@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>הרשמה לתור - מערכת ניהול תורים</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="kiosk-mode">
+    <!-- Kiosk Header -->
+    <header class="kiosk-header">
+        <div class="kiosk-header-content">
+            <div class="kiosk-logo">
+                <i class="fas fa-hospital"></i>
+                <span>מערכת ניהול תורים</span>
+            </div>
+            <div class="kiosk-time">
+                <div id="current-time" class="time-display"></div>
+                <div id="current-date" class="date-display"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Kiosk Content -->
+    <main class="kiosk-main">
+        <div class="registration-container">
+            <!-- Welcome Section -->
+            <div class="welcome-section">
+                <div class="welcome-icon">
+                    <i class="fas fa-user-plus"></i>
+                </div>
+                <h1 class="welcome-title">ברוכים הבאים</h1>
+                <p class="welcome-subtitle">הרשמה מהירה לתור</p>
+            </div>
+
+            <!-- Registration Form -->
+            <div class="registration-form">
+                <form id="checkinForm" class="kiosk-form">
+                    <div class="form-group">
+                        <label for="phoneNumber" class="form-label">
+                            <i class="fas fa-phone"></i>
+                            מספר טלפון
+                        </label>
+                        <input type="tel" id="phoneNumber" name="phoneNumber" class="form-input" 
+                               placeholder="הכנס את מספר הטלפון שלך" required>
+                    </div>
+
+                    <button type="submit" class="submit-btn">
+                        <i class="fas fa-check"></i>
+                        קבל מספר תור
+                    </button>
+                </form>
+            </div>
+
+            <!-- Result Section -->
+            <div id="resultSection" class="result-section hidden">
+                <div class="result-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h2 class="result-title">ההרשמה הושלמה בהצלחה!</h2>
+                <div class="queue-number-display">
+                    <div class="queue-number-label">מספר התור שלך:</div>
+                    <div id="queueNumber" class="queue-number"></div>
+                </div>
+                <div class="result-message">
+                    <p>אנא המתן בקרבת המקום</p>
+                    <p>המספר יופיע על המסך כאשר תורך יגיע</p>
+                </div>
+                <button onclick="resetForm()" class="reset-btn">
+                    <i class="fas fa-plus"></i>
+                    הרשמה נוספת
+                </button>
+            </div>
+
+            <!-- Instructions -->
+            <div class="instructions">
+                <h3>הוראות:</h3>
+                <ul>
+                    <li><i class="fas fa-info-circle"></i> הכנס את מספר הטלפון שלך</li>
+                    <li><i class="fas fa-check"></i> לחץ על "קבל מספר תור"</li>
+                    <li><i class="fas fa-clock"></i> המתן בקרבת המקום</li>
+                    <li><i class="fas fa-tv"></i> עקוב אחר המסך לתצוגה</li>
+                </ul>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Update time and date
+        function updateDateTime() {
+            const now = new Date();
+            const timeElement = document.getElementById('current-time');
+            const dateElement = document.getElementById('current-date');
+            
+            if (timeElement) {
+                timeElement.textContent = now.toLocaleTimeString('he-IL', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+            }
+            
+            if (dateElement) {
+                dateElement.textContent = now.toLocaleDateString('he-IL', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            }
+        }
+
+        // Handle form submission
+        document.getElementById('checkinForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const phoneNumber = document.getElementById('phoneNumber').value;
+            const submitBtn = document.querySelector('.submit-btn');
+            const originalText = submitBtn.innerHTML;
+            
+            // Show loading state
+            submitBtn.innerHTML = '<div class="loading"></div> מעבד...';
+            submitBtn.disabled = true;
+            
+            fetch('/checkin', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ phoneNumber })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.queueNumber) {
+                    showResult(data.queueNumber);
+                } else {
+                    throw new Error('לא התקבל מספר תור');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('שגיאה בהרשמה. אנא נסה שוב.');
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            });
+        });
+
+        // Show result
+        function showResult(queueNumber) {
+            document.getElementById('queueNumber').textContent = queueNumber;
+            document.getElementById('checkinForm').classList.add('hidden');
+            document.getElementById('resultSection').classList.remove('hidden');
+            
+            // Play success sound
+            playSuccessSound();
+        }
+
+        // Reset form
+        function resetForm() {
+            document.getElementById('checkinForm').classList.remove('hidden');
+            document.getElementById('resultSection').classList.add('hidden');
+            document.getElementById('phoneNumber').value = '';
+            document.getElementById('phoneNumber').focus();
+        }
+
+        // Play success sound
+        function playSuccessSound() {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.1);
+                oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.2);
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.5);
+            } catch (error) {
+                console.error('Error playing success sound:', error);
+            }
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Update time every second
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+            
+            // Focus on phone input
+            document.getElementById('phoneNumber').focus();
+            
+            // Auto-enter fullscreen after 2 seconds
+            setTimeout(() => {
+                if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen();
+                } else if (document.documentElement.webkitRequestFullscreen) {
+                    document.documentElement.webkitRequestFullscreen();
+                } else if (document.documentElement.msRequestFullscreen) {
+                    document.documentElement.msRequestFullscreen();
+                }
+            }, 2000);
+        });
+    </script>
+
+    <style>
+        /* Kiosk-specific styles */
+        .kiosk-mode {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: white;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .kiosk-header {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 2px solid #6366f1;
+            padding: 1rem 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+
+        .kiosk-header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .kiosk-logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #6366f1;
+        }
+
+        .kiosk-logo i {
+            font-size: 2rem;
+        }
+
+        .kiosk-time {
+            text-align: center;
+        }
+
+        .time-display {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #10b981;
+            font-family: 'Courier New', monospace;
+        }
+
+        .date-display {
+            font-size: 1rem;
+            color: #cbd5e1;
+            margin-top: 0.25rem;
+        }
+
+        .kiosk-main {
+            padding-top: 100px;
+            height: calc(100vh - 100px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .registration-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 2rem;
+            padding: 3rem;
+            max-width: 600px;
+            width: 90%;
+            text-align: center;
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        .welcome-section {
+            margin-bottom: 3rem;
+        }
+
+        .welcome-icon {
+            font-size: 4rem;
+            color: #6366f1;
+            margin-bottom: 1rem;
+        }
+
+        .welcome-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 0.5rem;
+        }
+
+        .welcome-subtitle {
+            font-size: 1.25rem;
+            color: #cbd5e1;
+        }
+
+        .registration-form {
+            margin-bottom: 3rem;
+        }
+
+        .kiosk-form {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .form-group {
+            text-align: right;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: white;
+        }
+
+        .form-label i {
+            margin-left: 0.5rem;
+            color: #6366f1;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 1rem;
+            font-size: 1.25rem;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #6366f1;
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.02);
+        }
+
+        .form-input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white;
+            border: none;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result-section {
+            text-align: center;
+        }
+
+        .result-icon {
+            font-size: 4rem;
+            color: #10b981;
+            margin-bottom: 1rem;
+        }
+
+        .result-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 2rem;
+        }
+
+        .queue-number-display {
+            background: rgba(34, 197, 94, 0.1);
+            border: 2px solid #10b981;
+            border-radius: 1rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .queue-number-label {
+            font-size: 1.125rem;
+            color: #cbd5e1;
+            margin-bottom: 0.5rem;
+        }
+
+        .queue-number {
+            font-size: 4rem;
+            font-weight: 700;
+            color: #10b981;
+            font-family: 'Courier New', monospace;
+        }
+
+        .result-message {
+            color: #cbd5e1;
+            margin-bottom: 2rem;
+        }
+
+        .result-message p {
+            margin: 0.5rem 0;
+            font-size: 1.125rem;
+        }
+
+        .reset-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 1rem;
+            padding: 1rem 2rem;
+            font-size: 1.125rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .reset-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .instructions {
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            padding-top: 2rem;
+            text-align: right;
+        }
+
+        .instructions h3 {
+            color: #6366f1;
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+        }
+
+        .instructions ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .instructions li {
+            margin: 0.5rem 0;
+            color: #cbd5e1;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .instructions i {
+            color: #6366f1;
+            width: 1rem;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .kiosk-header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .time-display {
+                font-size: 1.5rem;
+            }
+
+            .registration-container {
+                padding: 2rem;
+            }
+
+            .welcome-title {
+                font-size: 2rem;
+            }
+
+            .queue-number {
+                font-size: 3rem;
+            }
+        }
+
+        /* Hide scrollbars */
+        .kiosk-main::-webkit-scrollbar {
+            display: none;
+        }
+
+        .kiosk-main {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</body>
+</html>
