@@ -196,13 +196,23 @@
                         roomElement.style.animationDelay = `${index * 0.2}s`;
 
                         // Check if there's a new current patient (for notification)
-                        const currentPatientElement = roomElement.querySelector('.kiosk-current-number');
-                        if (currentPatientElement && room.currentPatient && 
-                            currentPatientElement.textContent !== room.currentPatient) {
-                            playNotificationSound();
-                            announcePatient(room.name, room.currentPatient);
+                        const existingRoomElement = document.querySelector(`[data-room="${room.name}"]`);
+                        let previousPatient = null;
+                        if (existingRoomElement) {
+                            const currentPatientElement = existingRoomElement.querySelector('.kiosk-current-number');
+                            if (currentPatientElement) {
+                                previousPatient = currentPatientElement.textContent;
+                            }
                         }
 
+                        // Announce if there's a new patient
+                        if (room.currentPatient && previousPatient !== room.currentPatient) {
+                            playNotificationSound();
+                            announcePatient(room.name, room.currentPatient);
+                            showLargeAnnouncement(room.name, room.currentPatient);
+                        }
+
+                        roomElement.setAttribute('data-room', room.name);
                         roomElement.innerHTML = `
                             <div class="kiosk-room-header">
                                 <h2 class="kiosk-room-name">
@@ -221,6 +231,10 @@
                                     `<div class="kiosk-current-display">
                                         <div class="kiosk-current-label">מטופל נוכחי</div>
                                         <div class="kiosk-current-number">${room.currentPatient}</div>
+                                        <button class="repeat-call-btn" onclick="repeatCall('${room.name}', '${room.currentPatient}')">
+                                            <i class="fas fa-volume-up"></i>
+                                            קריאה חוזרת
+                                        </button>
                                     </div>` : 
                                     `<div class="kiosk-no-patient">
                                         <i class="fas fa-info-circle"></i>
@@ -266,6 +280,47 @@
                 speechSynthesis.speak(utterance);
                 console.log(`🔊 Announcing: ${utterance.text}`);
             }
+        }
+
+        // Show large announcement overlay
+        function showLargeAnnouncement(roomName, patientNumber) {
+            // Remove existing announcement
+            const existingAnnouncement = document.getElementById('large-announcement');
+            if (existingAnnouncement) {
+                existingAnnouncement.remove();
+            }
+
+            // Create new announcement
+            const announcement = document.createElement('div');
+            announcement.id = 'large-announcement';
+            announcement.className = 'large-announcement';
+            announcement.innerHTML = `
+                <div class="announcement-content">
+                    <div class="announcement-icon">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                    <div class="announcement-text">
+                        <div class="announcement-room">${roomName}</div>
+                        <div class="announcement-patient">מספר ${patientNumber}</div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(announcement);
+
+            // Remove after 5 seconds
+            setTimeout(() => {
+                if (announcement.parentNode) {
+                    announcement.remove();
+                }
+            }, 5000);
+        }
+
+        // Repeat call function
+        function repeatCall(roomName, patientNumber) {
+            playNotificationSound();
+            announcePatient(roomName, patientNumber);
+            showLargeAnnouncement(roomName, patientNumber);
         }
 
         // Initialize page
@@ -616,6 +671,97 @@
         .audio-enable-btn:hover {
             background: rgba(99, 102, 241, 1);
             transform: scale(1.1);
+        }
+
+        .repeat-call-btn {
+            background: rgba(99, 102, 241, 0.8);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .repeat-call-btn:hover {
+            background: rgba(99, 102, 241, 1);
+            transform: scale(1.05);
+        }
+
+        .repeat-call-btn i {
+            font-size: 1rem;
+        }
+
+        .large-announcement {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .announcement-content {
+            background: rgba(99, 102, 241, 0.2);
+            border: 3px solid #6366f1;
+            border-radius: 2rem;
+            padding: 3rem;
+            text-align: center;
+            animation: scaleIn 0.5s ease-out;
+        }
+
+        .announcement-icon {
+            font-size: 4rem;
+            color: #6366f1;
+            margin-bottom: 1rem;
+        }
+
+        .announcement-text {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .announcement-room {
+            font-size: 3rem;
+            color: #10b981;
+            font-weight: 700;
+        }
+
+        .announcement-patient {
+            font-size: 4rem;
+            color: #6366f1;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes scaleIn {
+            from { 
+                opacity: 0; 
+                transform: scale(0.5); 
+            }
+            to { 
+                opacity: 1; 
+                transform: scale(1); 
+            }
         }
 
         @keyframes fadeInUp {
