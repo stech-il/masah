@@ -7,15 +7,42 @@ let databasePath = process.env.DATABASE_PATH;
 
 // אם אנחנו בייצור (Render) ולא הוגדר DATABASE_PATH, נשתמש בנתיב הדיסק הקבוע
 if (!databasePath && process.env.NODE_ENV === 'production') {
-  // בדיקה אם הדיסק הקבוע קיים
-  const persistentDiskPath = '/opt/render/project/src/data';
-  if (fs.existsSync(persistentDiskPath)) {
-    databasePath = path.join(persistentDiskPath, 'database.sqlite');
-    console.log('🔧 Using persistent disk path for production');
+  // רשימת נתיבים אפשריים לדיסק הקבוע
+  const possiblePersistentPaths = [
+    '/opt/render/project/src/data',
+    '/opt/render/project/data',
+    '/opt/render/project/src',
+    '/opt/render/project'
+  ];
+  
+  let foundPersistentPath = null;
+  
+  // בדיקה איזה נתיב קיים וניתן לכתיבה
+  for (const persistentPath of possiblePersistentPaths) {
+    if (fs.existsSync(persistentPath)) {
+      try {
+        // בדיקה אם ניתן לכתוב לנתיב
+        const testFile = path.join(persistentPath, 'test-write.txt');
+        fs.writeFileSync(testFile, 'test');
+        fs.unlinkSync(testFile);
+        foundPersistentPath = persistentPath;
+        console.log(`🔧 Found writable persistent path: ${persistentPath}`);
+        break;
+      } catch (error) {
+        console.log(`⚠️  Path ${persistentPath} exists but not writable: ${error.message}`);
+      }
+    } else {
+      console.log(`❌ Path ${persistentPath} does not exist`);
+    }
+  }
+  
+  if (foundPersistentPath) {
+    databasePath = path.join(foundPersistentPath, 'database.sqlite');
+    console.log(`🔧 Using persistent disk path: ${databasePath}`);
   } else {
     // אם הדיסק הקבוע לא קיים, נשתמש בנתיב ברירת מחדל
     databasePath = path.join(__dirname, '../database.sqlite');
-    console.log('⚠️  Persistent disk not found, using default path');
+    console.log('⚠️  No persistent disk found, using default path');
   }
 } else if (!databasePath) {
   // פיתוח - נתיב ברירת מחדל
