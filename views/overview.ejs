@@ -197,26 +197,6 @@
                         roomElement.className = 'kiosk-room-card';
                         roomElement.style.animationDelay = `${index * 0.2}s`;
 
-                        // Check if there's a new current patient (for notification)
-                        const existingRoomElement = document.querySelector(`[data-room="${room.name}"]`);
-                        let previousPatient = null;
-                        if (existingRoomElement) {
-                            const currentPatientElement = existingRoomElement.querySelector('.kiosk-current-number');
-                            if (currentPatientElement) {
-                                previousPatient = currentPatientElement.textContent;
-                            }
-                        }
-
-                        console.log(`🏥 Room: ${room.name}, Previous: ${previousPatient}, Current: ${room.currentPatient}`);
-
-                        // Announce if there's a new patient
-                        if (room.currentPatient && previousPatient !== room.currentPatient) {
-                            console.log(`🔔 NEW PATIENT DETECTED! Room: ${room.name}, Patient: ${room.currentPatient}`);
-                            playNotificationSound();
-                            announcePatient(room.name, room.currentPatient);
-                            showLargeAnnouncement(room.name, room.currentPatient);
-                        }
-
                         roomElement.setAttribute('data-room', room.name);
                         roomElement.innerHTML = `
                             <div class="kiosk-room-header">
@@ -236,10 +216,6 @@
                                     `<div class="kiosk-current-display">
                                         <div class="kiosk-current-label">מטופל נוכחי</div>
                                         <div class="kiosk-current-number">${room.currentPatient}</div>
-                                        <button class="repeat-call-btn" onclick="repeatCall('${room.name}', '${room.currentPatient}')">
-                                            <i class="fas fa-volume-up"></i>
-                                            קריאה חוזרת
-                                        </button>
                                     </div>` : 
                                     `<div class="kiosk-no-patient">
                                         <i class="fas fa-info-circle"></i>
