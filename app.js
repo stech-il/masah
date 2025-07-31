@@ -42,6 +42,28 @@ if (process.env.NODE_ENV === 'production') {
 
 app.use(session(sessionConfig));
 
+// Route פשוט לבדיקה
+app.get('/test', (req, res) => {
+  res.json({ message: 'Server is working!', timestamp: new Date().toISOString() });
+});
+
+// Route לבדיקת מיקום קבצים (לבדיקה בלבד)
+app.get('/debug/files', (req, res) => {
+  const debugInfo = {
+    __dirname: __dirname,
+    currentWorkingDirectory: process.cwd(),
+    publicPath: path.join(__dirname, 'public'),
+    cssPath: path.join(__dirname, 'public/css'),
+    styleCssExists: fs.existsSync(path.join(__dirname, 'public/css/style.css')),
+    publicStyleCssExists: fs.existsSync(path.join(__dirname, 'public/styles.css')),
+    rootStyleCssExists: fs.existsSync(path.join(__dirname, 'styles.css')),
+    publicDirContents: fs.readdirSync(path.join(__dirname, 'public')),
+    cssDirContents: fs.existsSync(path.join(__dirname, 'public/css')) ? fs.readdirSync(path.join(__dirname, 'public/css')) : 'CSS directory not found'
+  };
+  
+  res.json(debugInfo);
+});
+
 // Route ספציפי לקבצי CSS - מנסה מספר נתיבים
 app.get('/css/:filename', (req, res) => {
   const filename = req.params.filename;
@@ -63,23 +85,6 @@ app.get('/css/:filename', (req, res) => {
   console.log(`❌ CSS file not found: ${filename}`);
   console.log(`🔍 Searched paths:`, possiblePaths);
   res.status(404).send('CSS file not found');
-});
-
-// Route לבדיקת מיקום קבצים (לבדיקה בלבד)
-app.get('/debug/files', (req, res) => {
-  const debugInfo = {
-    __dirname: __dirname,
-    currentWorkingDirectory: process.cwd(),
-    publicPath: path.join(__dirname, 'public'),
-    cssPath: path.join(__dirname, 'public/css'),
-    styleCssExists: fs.existsSync(path.join(__dirname, 'public/css/style.css')),
-    publicStyleCssExists: fs.existsSync(path.join(__dirname, 'public/styles.css')),
-    rootStyleCssExists: fs.existsSync(path.join(__dirname, 'styles.css')),
-    publicDirContents: fs.readdirSync(path.join(__dirname, 'public')),
-    cssDirContents: fs.existsSync(path.join(__dirname, 'public/css')) ? fs.readdirSync(path.join(__dirname, 'public/css')) : 'CSS directory not found'
-  };
-  
-  res.json(debugInfo);
 });
 
 // הגדרת קבצים סטטיים - חשוב שזה יהיה לפני המסלולים
