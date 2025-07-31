@@ -707,5 +707,93 @@
             }
         }
     </style>
+    
+    <!-- Socket.IO Script -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Initialize Socket.IO connection
+        const socket = io();
+        
+        // Handle connection
+        socket.on('connect', () => {
+            console.log('🔌 Admin panel connected to server');
+        });
+        
+        // Handle disconnection
+        socket.on('disconnect', () => {
+            console.log('🔌 Admin panel disconnected from server');
+        });
+        
+        // Listen for system updates
+        socket.on('systemUpdate', (data) => {
+            console.log('📡 Received system update:', data);
+            
+            switch(data.type) {
+                case 'newPatient':
+                    showNotification(`מטופל חדש: מספר ${data.data.patientNumber}`, 'info');
+                    break;
+                case 'patientPromoted':
+                    showNotification(`מטופל מספר ${data.data.patientNumber} התקבל לחדר ${data.data.roomName}`, 'success');
+                    break;
+                case 'treatmentCompleted':
+                    showNotification(`טיפול הושלם בחדר ${data.data.roomName}`, 'info');
+                    break;
+                case 'refreshPatientList':
+                    // רענון רשימת מטופלים אם נדרש
+                    console.log('🔄 Refreshing patient list...');
+                    break;
+                case 'refreshNews':
+                    // רענון חדשות אם נדרש
+                    console.log('🔄 Refreshing news...');
+                    break;
+            }
+        });
+        
+        // Show notification function
+        function showNotification(message, type = 'info') {
+            // יצירת אלמנט הודעה
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.textContent = message;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+                color: white;
+                padding: 1rem 1.5rem;
+                border-radius: 0.5rem;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                z-index: 10000;
+                animation: slideIn 0.3s ease-out;
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // הסרה אוטומטית אחרי 5 שניות
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease-out';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 5000);
+        }
+        
+        // Add CSS animations
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
 </body>
 </html>

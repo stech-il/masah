@@ -6,6 +6,9 @@ const socketIo = require('socket.io'); // שימוש ב-Socket.IO
 const server = http.createServer(app);
 const io = socketIo(server); // חיבור ה-Socket.IO לשרת ה-HTTP
 
+// חשיפת ה-Socket.IO instance לשימוש ב-routes
+global.io = io;
+
 let queue = []; // אחסון התורים בזיכרון
 let rooms = {}; // אחסון החדרים והתורים שלהם בזיכרון
 
@@ -38,6 +41,12 @@ process.on('SIGINT', () => {
     process.exit(0);
   });
 });
+
+// פונקציה לשליחת עדכונים לכל הלקוחות
+function broadcastUpdate(type, data) {
+  console.log(`📡 Broadcasting ${type} update`);
+  io.emit('systemUpdate', { type, data, timestamp: Date.now() });
+}
 
 // חיבור ל-Socket.IO
 io.on('connection', (socket) => {
@@ -95,6 +104,34 @@ io.on('connection', (socket) => {
       patientNumber: patientNumber,
       type: 'repeat'
     });
+  });
+
+  // עדכון נתוני חדרים בזמן אמת
+  socket.on('requestRoomData', () => {
+    console.log('📊 Room data requested');
+    // שליחת נתוני חדרים מעודכנים
+    socket.emit('roomDataUpdated', { timestamp: Date.now() });
+  });
+
+  // עדכון רשימת מטופלים
+  socket.on('patientListUpdated', () => {
+    console.log('👥 Patient list updated');
+    // הודעה לכל הלקוחות על עדכון רשימת מטופלים
+    io.emit('refreshPatientList');
+  });
+
+  // עדכון חדשות
+  socket.on('newsUpdated', () => {
+    console.log('📰 News updated');
+    // הודעה לכל הלקוחות על עדכון חדשות
+    io.emit('refreshNews');
+  });
+
+  // עדכון סטטוס חדר
+  socket.on('roomStatusChanged', (data) => {
+    console.log('🚪 Room status changed:', data);
+    // הודעה לכל הלקוחות על שינוי סטטוס חדר
+    io.emit('roomStatusUpdated', data);
   });
 
   // טיפול בניתוק המשתמש

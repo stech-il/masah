@@ -851,6 +851,33 @@
             }
         });
         
+        // Listen for system updates
+        socket.on('systemUpdate', (data) => {
+            console.log('📡 Received system update:', data);
+            
+            switch(data.type) {
+                case 'newPatient':
+                    console.log('👤 New patient registered:', data.data);
+                    // רענון נתוני חדרים
+                    fetchRoomData();
+                    break;
+                case 'patientPromoted':
+                    console.log('🚪 Patient promoted:', data.data);
+                    // רענון נתוני חדרים
+                    fetchRoomData();
+                    break;
+                case 'treatmentCompleted':
+                    console.log('✅ Treatment completed:', data.data);
+                    // רענון נתוני חדרים
+                    fetchRoomData();
+                    break;
+                case 'refreshPatientList':
+                    console.log('🔄 Refreshing patient list...');
+                    fetchRoomData();
+                    break;
+            }
+        });
+        
         // Function to clear announced patients for a specific room (when treatment is completed)
         function clearAnnouncedPatient(roomName, patientNumber) {
             const patientKey = `${roomName}-${patientNumber}`;

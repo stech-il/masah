@@ -657,5 +657,42 @@
             scrollbar-width: none;
         }
     </style>
+    
+    <!-- Socket.IO Script -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Initialize Socket.IO connection
+        const socket = io();
+        
+        // Handle connection
+        socket.on('connect', () => {
+            console.log('🔌 Check-in page connected to server');
+        });
+        
+        // Handle disconnection
+        socket.on('disconnect', () => {
+            console.log('🔌 Check-in page disconnected from server');
+        });
+        
+        // Listen for system updates
+        socket.on('systemUpdate', (data) => {
+            console.log('📡 Received system update:', data);
+            
+            switch(data.type) {
+                case 'newPatient':
+                    console.log('👤 New patient registered:', data.data);
+                    // אפשר להציג הודעה על מטופל חדש שנרשם
+                    break;
+                case 'patientPromoted':
+                    console.log('🚪 Patient promoted:', data.data);
+                    // אפשר להציג הודעה על מטופל שהתקבל לטיפול
+                    break;
+                case 'treatmentCompleted':
+                    console.log('✅ Treatment completed:', data.data);
+                    // אפשר להציג הודעה על טיפול שהושלם
+                    break;
+            }
+        });
+    </script>
 </body>
 </html>

@@ -565,6 +565,42 @@
         socket.on('disconnect', () => {
             console.log('🔌 Disconnected from server');
         });
+        
+        // Listen for system updates
+        socket.on('systemUpdate', (data) => {
+            console.log('📡 Received system update:', data);
+            
+            switch(data.type) {
+                case 'newPatient':
+                    console.log('👤 New patient registered:', data.data);
+                    // רענון הדף אם המטופל החדש שייך לחדר זה
+                    if (data.data.roomName === '<%= user.room %>') {
+                        showNotification(`מטופל חדש: מספר ${data.data.patientNumber}`, 'info');
+                        setTimeout(() => window.location.reload(), 2000);
+                    }
+                    break;
+                case 'patientPromoted':
+                    console.log('🚪 Patient promoted:', data.data);
+                    // רענון הדף אם המטופל התקבל לחדר זה
+                    if (data.data.roomName === '<%= user.room %>') {
+                        showNotification(`מטופל מספר ${data.data.patientNumber} התקבל לטיפול`, 'success');
+                        setTimeout(() => window.location.reload(), 1000);
+                    }
+                    break;
+                case 'treatmentCompleted':
+                    console.log('✅ Treatment completed:', data.data);
+                    // רענון הדף אם הטיפול הושלם בחדר זה
+                    if (data.data.roomName === '<%= user.room %>') {
+                        showNotification('הטיפול הושלם', 'info');
+                        setTimeout(() => window.location.reload(), 1000);
+                    }
+                    break;
+                case 'refreshPatientList':
+                    console.log('🔄 Refreshing patient list...');
+                    window.location.reload();
+                    break;
+            }
+        });
     </script>
 </body>
 </html>

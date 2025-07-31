@@ -5,6 +5,14 @@ const News = require('../models/News'); // ייבוא המודל של החדשו
 
 const router = express.Router();
 
+// פונקציה לשליחת עדכונים בזמן אמת
+function notifyClients(type, data) {
+  // נשלח עדכון דרך Socket.IO אם זמין
+  if (global.io) {
+    global.io.emit('systemUpdate', { type, data, timestamp: Date.now() });
+  }
+}
+
 let lastUpdateTime = Date.now();
 let notificationQueue = []; // רשימת ההודעות שנשלחות ללקוחות
 // נתיב להצגת העמוד overview
@@ -52,7 +60,7 @@ router.post('/checkin', async (req, res) => {
   try {
     const patientNumber = await getNextPatientNumber();
 
-    await Appointment.create({
+    const newAppointment = await Appointment.create({
       phoneNumber,
       room: defaultRoom,
       status: 'waiting',
@@ -60,6 +68,14 @@ router.post('/checkin', async (req, res) => {
       isPrioritized: false
     });
     lastUpdateTime = Date.now(); // עדכון זמן אחרון שבו נעשה שינוי
+
+    // שליחת עדכון בזמן אמת
+    notifyClients('newPatient', {
+      patientId: newAppointment.id,
+      patientNumber: patientNumber,
+      roomName: defaultRoom,
+      phoneNumber: phoneNumber
+    });
 
     res.json({ 
       success: true, 
@@ -208,6 +224,14 @@ router.post('/room/promote/:id', isAuthenticated, async (req, res) => {
     // הוסף הודעה על קבלת המטופל
     addNotification(appointment.patientNumber, roomName);
 
+    // שליחת עדכון בזמן אמת
+    notifyClients('patientPromoted', {
+      patientId: appointment.id,
+      patientNumber: appointment.patientNumber,
+      roomName: roomName,
+      status: 'in-process'
+    });
+
     res.json({ success: true });
   } catch (err) {
     console.error("Error promoting patient:", err);
@@ -276,6 +300,12 @@ router.post('/room/complete', isAuthenticated, async (req, res) => {
   try {
     await Appointment.destroy({ where: { room: roomName, status: 'in-process' } });
     lastUpdateTime = Date.now(); // עדכון זמן אחרון שבו נעשה שינוי
+    
+    // שליחת עדכון בזמן אמת
+    notifyClients('treatmentCompleted', {
+      roomName: roomName
+    });
+    
     res.redirect('/room');
   } catch (err) {
     console.error("Error completing treatment:", err);
