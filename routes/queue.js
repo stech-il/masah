@@ -61,10 +61,17 @@ router.post('/checkin', async (req, res) => {
     });
     lastUpdateTime = Date.now(); // עדכון זמן אחרון שבו נעשה שינוי
 
-    res.json({ queueNumber: patientNumber });
+    res.json({ 
+      success: true, 
+      queueNumber: patientNumber,
+      message: 'ההרשמה הושלמה בהצלחה'
+    });
   } catch (error) {
     console.error('Error creating appointment:', error);
-    res.status(500).send('Error checking in');
+    res.status(500).json({ 
+      success: false, 
+      message: 'שגיאה בהרשמה. אנא נסה שוב.' 
+    });
   }
 });
 

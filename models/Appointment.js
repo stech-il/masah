@@ -11,6 +11,10 @@ const Appointment = sequelize.define('Appointment', {
     type: DataTypes.INTEGER,
     allowNull: false
   },
+  phoneNumber: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   status: {
     type: DataTypes.ENUM('waiting', 'in-process', 'completed'),
     defaultValue: 'waiting'
