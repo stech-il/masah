@@ -95,10 +95,10 @@ app.use(express.urlencoded({ extended: true }));
 // הגדרת session עם תמיכה בייצור
 const sessionConfig = {
   secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
-  resave: false,
-  saveUninitialized: false,
+  resave: true, // שינוי ל-true
+  saveUninitialized: true, // שינוי ל-true
   cookie: {
-    secure: process.env.NODE_ENV === 'production', // HTTPS בלבד בייצור
+    secure: false, // שינוי ל-false כדי שיעבוד גם ב-HTTP
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000 // 24 שעות
   }
@@ -108,6 +108,7 @@ const sessionConfig = {
 if (process.env.NODE_ENV === 'production') {
   // בינתיים נשתמש ב-MemoryStore אבל עם אזהרה
   console.log('⚠️  Warning: Using MemoryStore in production. Consider using Redis or another persistent store.');
+  console.log('🔧 Session config:', sessionConfig);
 } else {
   console.log('✅ Using MemoryStore for development');
 }
