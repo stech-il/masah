@@ -321,23 +321,32 @@ router.get('/room/getNotifications', (req, res) => {
 // מסלול לקבלת נתוני החדרים
 router.get('/rooms/data', async (req, res) => {
   try {
+    console.log('🔄 Fetching rooms data...');
     const rooms = await Room.findAll();
     const appointments = await Appointment.findAll();
+    
+    console.log('📊 Found rooms:', rooms.length);
+    console.log('📊 Found appointments:', appointments.length);
 
     const roomData = rooms.map(room => {
       const roomAppointments = appointments.filter(appt => appt.room === room.name);
       const currentPatient = roomAppointments.find(appt => appt.status === 'in-process');
       const waitingList = roomAppointments.filter(appt => appt.status === 'waiting');
-      return {
+      
+      const roomInfo = {
         name: room.name,
         currentPatient: currentPatient ? currentPatient.patientNumber : null,
         waitingList: waitingList.map(appt => ({ patientNumber: appt.patientNumber, id: appt.id }))
       };
+      
+      console.log(`🏥 Room ${room.name}:`, roomInfo);
+      return roomInfo;
     });
 
+    console.log('📤 Sending room data:', roomData);
     res.json(roomData);
   } catch (error) {
-    console.error('Error fetching room data:', error);
+    console.error('❌ Error fetching room data:', error);
     res.status(500).json({ error: 'Error fetching room data' });
   }
 });
