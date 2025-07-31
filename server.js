@@ -84,6 +84,19 @@ io.on('connection', (socket) => {
     }
   });
 
+  // קבלת בקשה לקריאה חוזרת מחדר
+  socket.on('repeatCall', (data) => {
+    console.log('🔊 Repeat call requested:', data);
+    const { roomName, patientNumber } = data;
+    
+    // שליחת הקריאה החוזרת לכל המסכים הראשיים
+    io.emit('announcePatient', {
+      roomName: roomName,
+      patientNumber: patientNumber,
+      type: 'repeat'
+    });
+  });
+
   // טיפול בניתוק המשתמש
   socket.on('disconnect', () => {
     console.log('👋 User disconnected:', socket.id);

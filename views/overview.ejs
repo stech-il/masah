@@ -232,10 +232,6 @@
                                     `<div class="kiosk-current-display">
                                         <div class="kiosk-current-label">מטופל נוכחי</div>
                                         <div class="kiosk-current-number">${room.currentPatient}</div>
-                                        <button class="repeat-call-btn" onclick="repeatCall('${room.name}', '${room.currentPatient}')">
-                                            <i class="fas fa-volume-up"></i>
-                                            קריאה חוזרת
-                                        </button>
                                     </div>` : 
                                     `<div class="kiosk-no-patient">
                                         <i class="fas fa-info-circle"></i>
@@ -323,19 +319,7 @@
             }, 8000);
         }
 
-        // Repeat call function
-        function repeatCall(roomName, patientNumber) {
-            console.log(`🔊 Repeat call for patient: ${patientNumber} in room: ${roomName}`);
-            
-            // Play notification sound
-            playNotificationSound();
-            
-            // Announce patient
-            announcePatient(roomName, patientNumber);
-            
-            // Show large announcement
-            showLargeAnnouncement(roomName, patientNumber);
-        }
+
 
         // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
@@ -687,33 +671,7 @@
             transform: scale(1.1);
         }
 
-        .repeat-call-btn {
-            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-            color: white;
-            border: none;
-            border-radius: 1rem;
-            padding: 0.75rem 1.5rem;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-top: 1rem;
-            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
-        }
 
-        .repeat-call-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
-            background: linear-gradient(135deg, #2563eb, #1e40af);
-        }
-
-        .repeat-call-btn:active {
-            transform: translateY(0);
-        }
-
-        .repeat-call-btn i {
-            font-size: 1rem;
-        }
 
         /* Large announcement styles */
         .large-announcement {
@@ -853,5 +811,38 @@
             scrollbar-width: none;
         }
     </style>
+    
+    <!-- Socket.IO Script -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Initialize Socket.IO connection
+        const socket = io();
+        
+        // Handle connection
+        socket.on('connect', () => {
+            console.log('🔌 Connected to server');
+        });
+        
+        // Handle disconnection
+        socket.on('disconnect', () => {
+            console.log('🔌 Disconnected from server');
+        });
+        
+        // Listen for repeat call announcements from room panels
+        socket.on('announcePatient', (data) => {
+            console.log('🔊 Received announcement:', data);
+            
+            if (data.type === 'repeat') {
+                // Play notification sound
+                playNotificationSound();
+                
+                // Announce patient
+                announcePatient(data.roomName, data.patientNumber);
+                
+                // Show large announcement
+                showLargeAnnouncement(data.roomName, data.patientNumber);
+            }
+        });
+    </script>
 </body>
 </html>

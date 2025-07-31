@@ -236,95 +236,23 @@
         function repeatCall(patientNumber) {
             console.log(`🔊 Repeat call for patient: ${patientNumber}`);
             
-            // Play notification sound
-            playNotificationSound();
+            // Get room name
+            const roomName = document.querySelector('.nav-link').textContent.trim();
             
-            // Announce patient
-            announcePatient(patientNumber);
-            
-            // Show large announcement
-            showLargeAnnouncement(patientNumber);
-            
-            showNotification('הקריאה נשלחה בהצלחה', 'success');
-        }
-
-        // Play notification sound
-        function playNotificationSound() {
-            try {
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-                oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
-                
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-                
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.3);
-            } catch (error) {
-                console.error('Error playing notification sound:', error);
-            }
-        }
-
-        // Announce patient with text-to-speech
-        function announcePatient(patientNumber) {
-            if ('speechSynthesis' in window) {
-                const utterance = new SpeechSynthesisUtterance();
-                utterance.text = `מספר ${patientNumber}, לחדר ${document.querySelector('.nav-link').textContent.trim()}`;
-                utterance.lang = 'he-IL';
-                utterance.rate = 0.7; // קצת יותר איטי
-                utterance.pitch = 1.1; // טון קצת גבוה יותר
-                utterance.volume = 0.9; // עוצמה גבוהה יותר
-                
-                // עצור הכרזות קודמות
-                speechSynthesis.cancel();
-                
-                speechSynthesis.speak(utterance);
-                console.log(`🔊 Announcing: ${utterance.text}`);
+            // Emit Socket.IO event to server
+            if (typeof io !== 'undefined') {
+                io.emit('repeatCall', {
+                    roomName: roomName,
+                    patientNumber: patientNumber
+                });
+                showNotification('הקריאה נשלחה בהצלחה', 'success');
             } else {
-                console.log('❌ Speech synthesis not supported');
+                console.error('Socket.IO not available');
+                showNotification('תקלה בשליחת הקריאה', 'error');
             }
         }
 
-        // Show large announcement overlay
-        function showLargeAnnouncement(patientNumber) {
-            // Remove existing announcement
-            const existingAnnouncement = document.getElementById('large-announcement');
-            if (existingAnnouncement) {
-                existingAnnouncement.remove();
-            }
 
-            // Create new announcement
-            const announcement = document.createElement('div');
-            announcement.id = 'large-announcement';
-            announcement.className = 'large-announcement';
-            announcement.innerHTML = `
-                <div class="announcement-content">
-                    <div class="announcement-icon">
-                        <i class="fas fa-bell"></i>
-                    </div>
-                    <div class="announcement-text">
-                        <div class="announcement-room">${document.querySelector('.nav-link').textContent.trim()}</div>
-                        <div class="announcement-patient">מספר ${patientNumber}</div>
-                        <div class="announcement-message">אנא התקדמו לחדר</div>
-                    </div>
-                </div>
-            `;
-
-            document.body.appendChild(announcement);
-
-            // Remove after 8 seconds (יותר זמן להכרזה)
-            setTimeout(() => {
-                if (announcement.parentNode) {
-                    announcement.remove();
-                }
-            }, 8000);
-        }
 
         // Promote patient
         function promotePatient(patientId) {
@@ -596,86 +524,7 @@
         }
 
         /* Large announcement styles */
-        .large-announcement {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.8));
-            backdrop-filter: blur(15px);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            animation: fadeIn 0.8s ease-out;
-        }
 
-        .announcement-content {
-            background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(99, 102, 241, 0.1));
-            border: 4px solid #6366f1;
-            border-radius: 3rem;
-            padding: 4rem;
-            text-align: center;
-            animation: scaleIn 0.8s ease-out;
-            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
-        }
-
-        .announcement-icon {
-            font-size: 5rem;
-            color: #6366f1;
-            margin-bottom: 2rem;
-            animation: pulse 2s infinite;
-        }
-
-        .announcement-text {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .announcement-room {
-            font-size: 3.5rem;
-            color: #10b981;
-            font-weight: 700;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-        }
-
-        .announcement-patient {
-            font-size: 5rem;
-            color: #6366f1;
-            font-weight: 700;
-            font-family: 'Courier New', monospace;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-        }
-
-        .announcement-message {
-            font-size: 2rem;
-            color: #cbd5e1;
-            font-style: italic;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        @keyframes scaleIn {
-            from { 
-                opacity: 0; 
-                transform: scale(0.5); 
-            }
-            to { 
-                opacity: 1; 
-                transform: scale(1); 
-            }
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-        }
 
         /* Responsive design */
         @media (max-width: 768px) {
@@ -700,5 +549,22 @@
             }
         }
     </style>
+    
+    <!-- Socket.IO Script -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Initialize Socket.IO connection
+        const socket = io();
+        
+        // Handle connection
+        socket.on('connect', () => {
+            console.log('🔌 Connected to server');
+        });
+        
+        // Handle disconnection
+        socket.on('disconnect', () => {
+            console.log('🔌 Disconnected from server');
+        });
+    </script>
 </body>
 </html>
