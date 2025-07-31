@@ -1,6 +1,7 @@
 const express = require('express');
 const session = require('express-session');
 const path = require('path');
+const fs = require('fs');
 const { connectDB } = require('./config/db');
 const queueRoutes = require('./routes/queue'); // ייבוא מסלול queue
 const authRoutes = require('./routes/auth'); // ייבוא מסלול auth
@@ -18,30 +19,6 @@ app.set('views', path.join(__dirname, 'views'));
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Middleware לטיפול ב-MIME types
-app.use((req, res, next) => {
-  if (req.path.endsWith('.css')) {
-    res.setHeader('Content-Type', 'text/css');
-  } else if (req.path.endsWith('.js')) {
-    res.setHeader('Content-Type', 'application/javascript');
-  } else if (req.path.endsWith('.png')) {
-    res.setHeader('Content-Type', 'image/png');
-  } else if (req.path.endsWith('.jpg') || req.path.endsWith('.jpeg')) {
-    res.setHeader('Content-Type', 'image/jpeg');
-  } else if (req.path.endsWith('.gif')) {
-    res.setHeader('Content-Type', 'image/gif');
-  } else if (req.path.endsWith('.svg')) {
-    res.setHeader('Content-Type', 'image/svg+xml');
-  } else if (req.path.endsWith('.woff')) {
-    res.setHeader('Content-Type', 'font/woff');
-  } else if (req.path.endsWith('.woff2')) {
-    res.setHeader('Content-Type', 'font/woff2');
-  } else if (req.path.endsWith('.ttf')) {
-    res.setHeader('Content-Type', 'font/ttf');
-  }
-  next();
-});
 
 // הגדרת session עם תמיכה בייצור
 const sessionConfig = {
@@ -65,19 +42,32 @@ if (process.env.NODE_ENV === 'production') {
 
 app.use(session(sessionConfig));
 
+// Route ספציפי לקבצי CSS
+app.get('/css/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const filePath = path.join(__dirname, 'public/css', filename);
+  
+  if (fs.existsSync(filePath)) {
+    res.setHeader('Content-Type', 'text/css; charset=utf-8');
+    res.sendFile(filePath);
+  } else {
+    res.status(404).send('CSS file not found');
+  }
+});
+
 // הגדרת קבצים סטטיים - חשוב שזה יהיה לפני המסלולים
 app.use('/css', express.static(path.join(__dirname, 'public/css'), {
-  setHeaders: (res, path) => {
-    if (path.endsWith('.css')) {
-      res.setHeader('Content-Type', 'text/css');
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css; charset=utf-8');
     }
   }
 }));
 
 app.use('/js', express.static(path.join(__dirname, 'public/js'), {
-  setHeaders: (res, path) => {
-    if (path.endsWith('.js')) {
-      res.setHeader('Content-Type', 'application/javascript');
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
     }
   }
 }));
@@ -88,7 +78,29 @@ app.use('/images', express.static(path.join(__dirname, 'public/images')));
 app.use('/audio', express.static(path.join(__dirname, 'audio')));
 
 // הגדרת קבצים סטטיים כלליים
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css; charset=utf-8');
+    } else if (filePath.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    } else if (filePath.endsWith('.png')) {
+      res.setHeader('Content-Type', 'image/png');
+    } else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) {
+      res.setHeader('Content-Type', 'image/jpeg');
+    } else if (filePath.endsWith('.gif')) {
+      res.setHeader('Content-Type', 'image/gif');
+    } else if (filePath.endsWith('.svg')) {
+      res.setHeader('Content-Type', 'image/svg+xml');
+    } else if (filePath.endsWith('.woff')) {
+      res.setHeader('Content-Type', 'font/woff');
+    } else if (filePath.endsWith('.woff2')) {
+      res.setHeader('Content-Type', 'font/woff2');
+    } else if (filePath.endsWith('.ttf')) {
+      res.setHeader('Content-Type', 'font/ttf');
+    }
+  }
+}));
 
 // הגדרת המסלולים
 app.use('/', authRoutes);
