@@ -15,6 +15,7 @@ const app = express();
 // התחברות למסד הנתונים ויצירת משתמש מנהל ראשון
 async function initializeDatabase() {
   try {
+    console.log('🚀 Starting database initialization...');
     await connectDB();
     console.log('✅ Database connected successfully');
     
@@ -73,11 +74,31 @@ async function initializeDatabase() {
       }
       
       console.log('🎉 Database initialization completed successfully!');
+      
+      // בדיקה סופית
+      const finalUsersCount = await User.count();
+      const finalRoomsCount = await Room.count();
+      console.log(`📊 Final database state: ${finalUsersCount} users, ${finalRoomsCount} rooms`);
+      
     } else {
       console.log('✅ Database already has users, skipping initialization');
+      
+      // בדיקת מצב הדטה בייס
+      const roomsCount = await Room.count();
+      const adminUsers = await User.findAll({ where: { isAdmin: true } });
+      const roomUsers = await User.findAll({ where: { isAdmin: false } });
+      
+      console.log(`📊 Database status: ${usersCount} users, ${roomsCount} rooms`);
+      console.log(`👑 Admin users: ${adminUsers.length}`);
+      console.log(`👥 Room users: ${roomUsers.length}`);
     }
   } catch (error) {
     console.error('❌ Error initializing database:', error);
+    console.error('🔍 Full error details:', error);
+    
+    // נסה שוב אחרי 5 שניות
+    console.log('🔄 Retrying database initialization in 5 seconds...');
+    setTimeout(initializeDatabase, 5000);
   }
 }
 
@@ -145,6 +166,74 @@ app.get('/status', async (req, res) => {
   } catch (error) {
     res.status(500).json({
       status: 'ERROR',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Route לבדיקת מצב הדיסק והדטה בייס
+app.get('/debug/disk', (req, res) => {
+  const databasePath = process.env.DATABASE_PATH || path.join(__dirname, '../database.sqlite');
+  const dataDir = path.dirname(databasePath);
+  
+  try {
+    const diskInfo = {
+      environment: {
+        NODE_ENV: process.env.NODE_ENV,
+        DATABASE_PATH: process.env.DATABASE_PATH,
+        PWD: process.env.PWD,
+        CWD: process.cwd()
+      },
+      paths: {
+        databasePath: databasePath,
+        dataDir: dataDir,
+        __dirname: __dirname
+      },
+      fileSystem: {
+        dataDirExists: fs.existsSync(dataDir),
+        databaseFileExists: fs.existsSync(databasePath),
+        canWriteToDataDir: false,
+        canWriteToDatabase: false
+      },
+      permissions: {}
+    };
+    
+    // בדיקת הרשאות כתיבה
+    try {
+      const testFile = path.join(dataDir, 'test-write.txt');
+      fs.writeFileSync(testFile, 'test');
+      fs.unlinkSync(testFile);
+      diskInfo.fileSystem.canWriteToDataDir = true;
+    } catch (error) {
+      diskInfo.fileSystem.canWriteToDataDir = false;
+      diskInfo.permissions.dataDirError = error.message;
+    }
+    
+    try {
+      const testFile = path.join(path.dirname(databasePath), 'test-db-write.txt');
+      fs.writeFileSync(testFile, 'test');
+      fs.unlinkSync(testFile);
+      diskInfo.fileSystem.canWriteToDatabase = true;
+    } catch (error) {
+      diskInfo.fileSystem.canWriteToDatabase = false;
+      diskInfo.permissions.databaseError = error.message;
+    }
+    
+    // מידע על קובץ הדטה בייס אם קיים
+    if (fs.existsSync(databasePath)) {
+      const stats = fs.statSync(databasePath);
+      diskInfo.databaseFile = {
+        size: stats.size,
+        created: stats.birthtime,
+        modified: stats.mtime,
+        accessed: stats.atime
+      };
+    }
+    
+    res.json(diskInfo);
+  } catch (error) {
+    res.status(500).json({
       error: error.message,
       timestamp: new Date().toISOString()
     });
