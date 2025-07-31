@@ -66,6 +66,7 @@
         let lastNotificationTime = 0;
         let currentNewsIndex = 0;
         let newsItems = [];
+        let announcedPatients = new Set(); // מעקב אחר מטופלים שכבר הוכרזו
 
         // Initialize audio context
         function enableAudio() {
@@ -194,24 +195,30 @@
                         roomElement.style.animationDelay = `${index * 0.2}s`;
 
                         // Check if there's a new current patient (for notification)
-                        const existingRoomElement = document.querySelector(`[data-room="${room.name}"]`);
-                        let previousPatient = null;
-                        if (existingRoomElement) {
-                            const currentPatientElement = existingRoomElement.querySelector('.kiosk-current-number');
-                            if (currentPatientElement) {
-                                previousPatient = currentPatientElement.textContent;
-                            }
-                        }
-
-                        console.log(`🏥 Room: ${room.name}, Previous: ${previousPatient}, Current: ${room.currentPatient}`);
-
-                        // Announce if there's a new patient (only when promoted to treatment)
-                        if (room.currentPatient && previousPatient !== room.currentPatient) {
+                        const patientKey = `${room.name}-${room.currentPatient}`;
+                        
+                        // Announce only if this is a new patient that hasn't been announced yet
+                        if (room.currentPatient && !announcedPatients.has(patientKey)) {
                             console.log(`🔔 NEW PATIENT PROMOTED! Room: ${room.name}, Patient: ${room.currentPatient}`);
+                            
+                            // Add to announced set to prevent duplicate announcements
+                            announcedPatients.add(patientKey);
+                            
+                            // Announce the patient
                             playNotificationSound();
                             announcePatient(room.name, room.currentPatient);
                             showLargeAnnouncement(room.name, room.currentPatient);
                         }
+                        
+                        // Clean up announced patients for rooms that no longer have current patients
+                        // This allows the same patient to be announced again if they return
+                        announcedPatients.forEach(key => {
+                            const [roomName, patientNumber] = key.split('-');
+                            if (roomName === room.name && room.currentPatient !== patientNumber) {
+                                announcedPatients.delete(key);
+                                console.log(`🧹 Cleared completed patient: ${key}`);
+                            }
+                        });
 
                         roomElement.setAttribute('data-room', room.name);
                         roomElement.innerHTML = `
@@ -843,6 +850,13 @@
                 showLargeAnnouncement(data.roomName, data.patientNumber);
             }
         });
+        
+        // Function to clear announced patients for a specific room (when treatment is completed)
+        function clearAnnouncedPatient(roomName, patientNumber) {
+            const patientKey = `${roomName}-${patientNumber}`;
+            announcedPatients.delete(patientKey);
+            console.log(`🧹 Cleared announced patient: ${patientKey}`);
+        }
     </script>
 </body>
 </html>
