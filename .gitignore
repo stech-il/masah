@@ -144,6 +144,9 @@ jspm_packages/
 *.sqlite3
 *.db
 
+# Data directory
+data/
+
 # IDE files
 .vscode/
 .idea/

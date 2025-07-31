@@ -1,10 +1,21 @@
 const { Sequelize } = require('sequelize');
 const path = require('path');
+const fs = require('fs');
+
+// קביעת נתיב הדטה בייס - שימוש בנתיב מהסביבה או ברירת מחדל
+const databasePath = process.env.DATABASE_PATH || path.join(__dirname, '../database.sqlite');
+
+// יצירת תיקיית הנתונים אם לא קיימת
+const dataDir = path.dirname(databasePath);
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+  console.log(`📁 Created data directory: ${dataDir}`);
+}
 
 // יצירת חיבור Sequelize עם SQLite
 const sequelize = new Sequelize({
   dialect: 'sqlite',
-  storage: path.join(__dirname, '../database.sqlite'),
+  storage: databasePath,
   logging: false // כיבוי לוגים של SQL
 });
 
