@@ -43,10 +43,32 @@
                             מספר טלפון
                         </label>
                         <input type="tel" id="phoneNumber" name="phoneNumber" class="form-input" 
-                               placeholder="הכנס את מספר הטלפון שלך" required>
+                               placeholder="הכנס את מספר הטלפון שלך" required readonly>
                     </div>
 
-                    <button type="submit" class="submit-btn">
+                    <!-- Numeric Keypad -->
+                    <div class="keypad-container">
+                        <div class="keypad-grid">
+                            <button type="button" class="keypad-btn" onclick="addNumber('1')">1</button>
+                            <button type="button" class="keypad-btn" onclick="addNumber('2')">2</button>
+                            <button type="button" class="keypad-btn" onclick="addNumber('3')">3</button>
+                            <button type="button" class="keypad-btn" onclick="addNumber('4')">4</button>
+                            <button type="button" class="keypad-btn" onclick="addNumber('5')">5</button>
+                            <button type="button" class="keypad-btn" onclick="addNumber('6')">6</button>
+                            <button type="button" class="keypad-btn" onclick="addNumber('7')">7</button>
+                            <button type="button" class="keypad-btn" onclick="addNumber('8')">8</button>
+                            <button type="button" class="keypad-btn" onclick="addNumber('9')">9</button>
+                            <button type="button" class="keypad-btn clear-btn" onclick="clearInput()">
+                                <i class="fas fa-eraser"></i>
+                            </button>
+                            <button type="button" class="keypad-btn" onclick="addNumber('0')">0</button>
+                            <button type="button" class="keypad-btn delete-btn" onclick="deleteLastChar()">
+                                <i class="fas fa-backspace"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="submit-btn" id="submitBtn" disabled>
                         <i class="fas fa-check"></i>
                         קבל מספר תור
                     </button>
@@ -87,6 +109,120 @@
     </main>
 
     <script>
+        // Keypad functions
+        function addNumber(num) {
+            const input = document.getElementById('phoneNumber');
+            const currentValue = input.value;
+            
+            // Limit to 10 digits
+            if (currentValue.length < 10) {
+                input.value = currentValue + num;
+                updateSubmitButton();
+            }
+        }
+
+        function clearInput() {
+            const input = document.getElementById('phoneNumber');
+            input.value = '';
+            updateSubmitButton();
+        }
+
+        function deleteLastChar() {
+            const input = document.getElementById('phoneNumber');
+            input.value = input.value.slice(0, -1);
+            updateSubmitButton();
+        }
+
+        function updateSubmitButton() {
+            const input = document.getElementById('phoneNumber');
+            const submitBtn = document.getElementById('submitBtn');
+            
+            // Enable submit button if phone number has at least 9 digits
+            if (input.value.length >= 9) {
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+            } else {
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.7';
+            }
+        }
+
+        // Form submission
+        document.getElementById('checkinForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const phoneNumber = document.getElementById('phoneNumber').value;
+            if (phoneNumber.length < 9) {
+                alert('אנא הכנס מספר טלפון תקין (לפחות 9 ספרות)');
+                return;
+            }
+
+            // Show loading state
+            const submitBtn = document.getElementById('submitBtn');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<span class="loading"></span> מעבד...';
+            submitBtn.disabled = true;
+
+            // Submit form
+            fetch('/checkin', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ phoneNumber: phoneNumber })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showResult(data.queueNumber);
+                    playSuccessSound();
+                } else {
+                    alert(data.message || 'שגיאה בהרשמה');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('שגיאה בהרשמה');
+            })
+            .finally(() => {
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            });
+        });
+
+        function showResult(queueNumber) {
+            document.getElementById('queueNumber').textContent = queueNumber;
+            document.getElementById('resultSection').classList.remove('hidden');
+            document.querySelector('.registration-form').classList.add('hidden');
+        }
+
+        function resetForm() {
+            document.getElementById('checkinForm').reset();
+            document.getElementById('resultSection').classList.add('hidden');
+            document.querySelector('.registration-form').classList.remove('hidden');
+            updateSubmitButton();
+        }
+
+        function playSuccessSound() {
+            // Create audio context for success sound
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+            oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.1);
+            oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.2);
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
+        }
+
         // Update time and date
         function updateDateTime() {
             const now = new Date();
@@ -111,102 +247,11 @@
             }
         }
 
-        // Handle form submission
-        document.getElementById('checkinForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const phoneNumber = document.getElementById('phoneNumber').value;
-            const submitBtn = document.querySelector('.submit-btn');
-            const originalText = submitBtn.innerHTML;
-            
-            // Show loading state
-            submitBtn.innerHTML = '<div class="loading"></div> מעבד...';
-            submitBtn.disabled = true;
-            
-            fetch('/checkin', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ phoneNumber })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.queueNumber) {
-                    showResult(data.queueNumber);
-                } else {
-                    throw new Error('לא התקבל מספר תור');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('שגיאה בהרשמה. אנא נסה שוב.');
-                submitBtn.innerHTML = originalText;
-                submitBtn.disabled = false;
-            });
-        });
-
-        // Show result
-        function showResult(queueNumber) {
-            document.getElementById('queueNumber').textContent = queueNumber;
-            document.getElementById('checkinForm').classList.add('hidden');
-            document.getElementById('resultSection').classList.remove('hidden');
-            
-            // Play success sound
-            playSuccessSound();
-        }
-
-        // Reset form
-        function resetForm() {
-            document.getElementById('checkinForm').classList.remove('hidden');
-            document.getElementById('resultSection').classList.add('hidden');
-            document.getElementById('phoneNumber').value = '';
-            document.getElementById('phoneNumber').focus();
-        }
-
-        // Play success sound
-        function playSuccessSound() {
-            try {
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-                oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.1);
-                oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.2);
-                
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-                
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.5);
-            } catch (error) {
-                console.error('Error playing success sound:', error);
-            }
-        }
-
-        // Initialize page
+        // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            // Update time every second
             updateDateTime();
             setInterval(updateDateTime, 1000);
-            
-            // Focus on phone input
-            document.getElementById('phoneNumber').focus();
-            
-            // Auto-enter fullscreen after 2 seconds
-            setTimeout(() => {
-                if (document.documentElement.requestFullscreen) {
-                    document.documentElement.requestFullscreen();
-                } else if (document.documentElement.webkitRequestFullscreen) {
-                    document.documentElement.webkitRequestFullscreen();
-                } else if (document.documentElement.msRequestFullscreen) {
-                    document.documentElement.msRequestFullscreen();
-                }
-            }, 2000);
+            updateSubmitButton();
         });
     </script>
 
@@ -513,6 +558,64 @@
 
         @keyframes spin {
             to { transform: rotate(360deg); }
+        }
+
+        /* Numeric Keypad Styles */
+        .keypad-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        .keypad-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            max-width: 300px;
+            width: 100%;
+        }
+
+        .keypad-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            font-size: 1.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .keypad-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .keypad-btn.clear-btn {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border-color: #ef4444;
+        }
+
+        .keypad-btn.clear-btn:hover {
+            background: rgba(239, 68, 68, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .keypad-btn.delete-btn {
+            background: rgba(107, 114, 128, 0.1);
+            color: #6b7280;
+            border-color: #6b7280;
+        }
+
+        .keypad-btn.delete-btn:hover {
+            background: rgba(107, 114, 128, 0.2);
+            transform: translateY(-2px);
         }
 
         /* Responsive design */
