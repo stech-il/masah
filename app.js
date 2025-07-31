@@ -174,8 +174,22 @@ app.get('/status', async (req, res) => {
 
 // Route לבדיקת מצב הדיסק והדטה בייס
 app.get('/debug/disk', (req, res) => {
-  const databasePath = process.env.DATABASE_PATH || path.join(__dirname, '../database.sqlite');
+  let databasePath = process.env.DATABASE_PATH;
+  
+  // אם אנחנו בייצור (Render) ולא הוגדר DATABASE_PATH, נשתמש בנתיב הדיסק הקבוע
+  if (!databasePath && process.env.NODE_ENV === 'production') {
+    const persistentDiskPath = '/opt/render/project/src/data';
+    if (fs.existsSync(persistentDiskPath)) {
+      databasePath = path.join(persistentDiskPath, 'database.sqlite');
+    } else {
+      databasePath = path.join(__dirname, '../database.sqlite');
+    }
+  } else if (!databasePath) {
+    databasePath = path.join(__dirname, '../database.sqlite');
+  }
+  
   const dataDir = path.dirname(databasePath);
+  const persistentDiskPath = '/opt/render/project/src/data';
   
   try {
     const diskInfo = {
@@ -188,13 +202,16 @@ app.get('/debug/disk', (req, res) => {
       paths: {
         databasePath: databasePath,
         dataDir: dataDir,
-        __dirname: __dirname
+        __dirname: __dirname,
+        persistentDiskPath: persistentDiskPath
       },
       fileSystem: {
         dataDirExists: fs.existsSync(dataDir),
         databaseFileExists: fs.existsSync(databasePath),
+        persistentDiskExists: fs.existsSync(persistentDiskPath),
         canWriteToDataDir: false,
-        canWriteToDatabase: false
+        canWriteToDatabase: false,
+        canWriteToPersistentDisk: false
       },
       permissions: {}
     };
@@ -220,6 +237,16 @@ app.get('/debug/disk', (req, res) => {
       diskInfo.permissions.databaseError = error.message;
     }
     
+    try {
+      const testFile = path.join(persistentDiskPath, 'test-persistent-write.txt');
+      fs.writeFileSync(testFile, 'test');
+      fs.unlinkSync(testFile);
+      diskInfo.fileSystem.canWriteToPersistentDisk = true;
+    } catch (error) {
+      diskInfo.fileSystem.canWriteToPersistentDisk = false;
+      diskInfo.permissions.persistentDiskError = error.message;
+    }
+    
     // מידע על קובץ הדטה בייס אם קיים
     if (fs.existsSync(databasePath)) {
       const stats = fs.statSync(databasePath);
@@ -229,6 +256,25 @@ app.get('/debug/disk', (req, res) => {
         modified: stats.mtime,
         accessed: stats.atime
       };
+    }
+    
+    // מידע על תיקיית הדיסק הקבוע אם קיימת
+    if (fs.existsSync(persistentDiskPath)) {
+      try {
+        const diskStats = fs.statSync(persistentDiskPath);
+        const diskContents = fs.readdirSync(persistentDiskPath);
+        diskInfo.persistentDisk = {
+          exists: true,
+          isDirectory: diskStats.isDirectory(),
+          permissions: diskStats.mode,
+          contents: diskContents
+        };
+      } catch (error) {
+        diskInfo.persistentDisk = {
+          exists: true,
+          error: error.message
+        };
+      }
     }
     
     res.json(diskInfo);

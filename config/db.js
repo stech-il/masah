@@ -3,10 +3,28 @@ const path = require('path');
 const fs = require('fs');
 
 // קביעת נתיב הדטה בייס - שימוש בנתיב מהסביבה או ברירת מחדל
-const databasePath = process.env.DATABASE_PATH || path.join(__dirname, '../database.sqlite');
+let databasePath = process.env.DATABASE_PATH;
+
+// אם אנחנו בייצור (Render) ולא הוגדר DATABASE_PATH, נשתמש בנתיב הדיסק הקבוע
+if (!databasePath && process.env.NODE_ENV === 'production') {
+  // בדיקה אם הדיסק הקבוע קיים
+  const persistentDiskPath = '/opt/render/project/src/data';
+  if (fs.existsSync(persistentDiskPath)) {
+    databasePath = path.join(persistentDiskPath, 'database.sqlite');
+    console.log('🔧 Using persistent disk path for production');
+  } else {
+    // אם הדיסק הקבוע לא קיים, נשתמש בנתיב ברירת מחדל
+    databasePath = path.join(__dirname, '../database.sqlite');
+    console.log('⚠️  Persistent disk not found, using default path');
+  }
+} else if (!databasePath) {
+  // פיתוח - נתיב ברירת מחדל
+  databasePath = path.join(__dirname, '../database.sqlite');
+}
 
 console.log('🔍 Database Configuration:');
 console.log(`   Environment DATABASE_PATH: ${process.env.DATABASE_PATH}`);
+console.log(`   NODE_ENV: ${process.env.NODE_ENV}`);
 console.log(`   Final database path: ${databasePath}`);
 console.log(`   Current working directory: ${process.cwd()}`);
 console.log(`   __dirname: ${__dirname}`);
