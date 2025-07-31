@@ -42,21 +42,57 @@ if (process.env.NODE_ENV === 'production') {
 
 app.use(session(sessionConfig));
 
-// Route ספציפי לקבצי CSS
+// Route ספציפי לקבצי CSS - מנסה מספר נתיבים
 app.get('/css/:filename', (req, res) => {
   const filename = req.params.filename;
-  const filePath = path.join(__dirname, 'public/css', filename);
+  const possiblePaths = [
+    path.join(__dirname, 'public/css', filename),
+    path.join(__dirname, 'public', filename),
+    path.join(__dirname, filename)
+  ];
   
-  if (fs.existsSync(filePath)) {
-    res.setHeader('Content-Type', 'text/css; charset=utf-8');
-    res.sendFile(filePath);
-  } else {
-    res.status(404).send('CSS file not found');
+  for (const filePath of possiblePaths) {
+    if (fs.existsSync(filePath)) {
+      console.log(`✅ Found CSS file at: ${filePath}`);
+      res.setHeader('Content-Type', 'text/css; charset=utf-8');
+      res.sendFile(filePath);
+      return;
+    }
   }
+  
+  console.log(`❌ CSS file not found: ${filename}`);
+  console.log(`🔍 Searched paths:`, possiblePaths);
+  res.status(404).send('CSS file not found');
+});
+
+// Route לבדיקת מיקום קבצים (לבדיקה בלבד)
+app.get('/debug/files', (req, res) => {
+  const debugInfo = {
+    __dirname: __dirname,
+    currentWorkingDirectory: process.cwd(),
+    publicPath: path.join(__dirname, 'public'),
+    cssPath: path.join(__dirname, 'public/css'),
+    styleCssExists: fs.existsSync(path.join(__dirname, 'public/css/style.css')),
+    publicStyleCssExists: fs.existsSync(path.join(__dirname, 'public/styles.css')),
+    rootStyleCssExists: fs.existsSync(path.join(__dirname, 'styles.css')),
+    publicDirContents: fs.readdirSync(path.join(__dirname, 'public')),
+    cssDirContents: fs.existsSync(path.join(__dirname, 'public/css')) ? fs.readdirSync(path.join(__dirname, 'public/css')) : 'CSS directory not found'
+  };
+  
+  res.json(debugInfo);
 });
 
 // הגדרת קבצים סטטיים - חשוב שזה יהיה לפני המסלולים
 app.use('/css', express.static(path.join(__dirname, 'public/css'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css; charset=utf-8');
+    }
+  }
+}));
+
+// נתיב נוסף לקבצי CSS
+app.use('/css', express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.css')) {
       res.setHeader('Content-Type', 'text/css; charset=utf-8');
