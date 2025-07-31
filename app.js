@@ -2,15 +2,87 @@ const express = require('express');
 const session = require('express-session');
 const path = require('path');
 const fs = require('fs');
+const bcrypt = require('bcrypt');
 const { connectDB } = require('./config/db');
+const User = require('./models/User');
+const Room = require('./models/Room');
 const queueRoutes = require('./routes/queue'); // ייבוא מסלול queue
 const authRoutes = require('./routes/auth'); // ייבוא מסלול auth
 const adminRoutes = require('./routes/admin'); // ייבוא מסלול admin
 
 const app = express();
 
-// התחברות למסד הנתונים
-connectDB();
+// התחברות למסד הנתונים ויצירת משתמש מנהל ראשון
+async function initializeDatabase() {
+  try {
+    await connectDB();
+    console.log('✅ Database connected successfully');
+    
+    // בדוק אם יש משתמשים במסד הנתונים
+    const usersCount = await User.count();
+    console.log(`📊 Found ${usersCount} users in database`);
+    
+    if (usersCount === 0) {
+      console.log('👤 Creating initial admin user...');
+      
+      // צור סיסמה מוצפנת
+      const hashedPassword = await bcrypt.hash('admin123', 10);
+      
+      // צור משתמש מנהל ראשון
+      await User.create({
+        username: 'admin',
+        password: hashedPassword,
+        room: 'admin_room',
+        isAdmin: true
+      });
+      
+      console.log('✅ Initial admin user created successfully!');
+      console.log('👤 Username: admin');
+      console.log('🔑 Password: admin123');
+      
+      // צור חדרים ראשוניים
+      console.log('🏥 Creating initial rooms...');
+      const rooms = [
+        { name: 'חדר 1' },
+        { name: 'חדר 2' },
+        { name: 'חדר 3' }
+      ];
+      
+      for (const roomData of rooms) {
+        await Room.create(roomData);
+        console.log(`✅ Created room: ${roomData.name}`);
+      }
+      
+      // צור משתמשי חדר
+      console.log('👥 Creating room users...');
+      const roomUsers = [
+        { username: 'room1', password: 'room123', room: 'חדר 1', isAdmin: false },
+        { username: 'room2', password: 'room123', room: 'חדר 2', isAdmin: false },
+        { username: 'room3', password: 'room123', room: 'חדר 3', isAdmin: false }
+      ];
+      
+      for (const userData of roomUsers) {
+        const hashedUserPassword = await bcrypt.hash(userData.password, 10);
+        await User.create({
+          username: userData.username,
+          password: hashedUserPassword,
+          room: userData.room,
+          isAdmin: userData.isAdmin
+        });
+        console.log(`✅ Created user: ${userData.username} for ${userData.room}`);
+      }
+      
+      console.log('🎉 Database initialization completed successfully!');
+    } else {
+      console.log('✅ Database already has users, skipping initialization');
+    }
+  } catch (error) {
+    console.error('❌ Error initializing database:', error);
+  }
+}
+
+// הפעל את האתחול
+initializeDatabase();
 
 // הגדרת מנוע תבניות
 app.set('view engine', 'ejs');
@@ -45,6 +117,37 @@ app.use(session(sessionConfig));
 // Route פשוט לבדיקה
 app.get('/test', (req, res) => {
   res.json({ message: 'Server is working!', timestamp: new Date().toISOString() });
+});
+
+// Route לבדיקת מצב המערכת
+app.get('/status', async (req, res) => {
+  try {
+    const usersCount = await User.count();
+    const roomsCount = await Room.count();
+    const adminUsers = await User.findAll({ where: { isAdmin: true } });
+    const roomUsers = await User.findAll({ where: { isAdmin: false } });
+    
+    res.json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      database: {
+        users: usersCount,
+        rooms: roomsCount,
+        adminUsers: adminUsers.length,
+        roomUsers: roomUsers.length
+      },
+      users: {
+        admin: adminUsers.map(u => ({ username: u.username, room: u.room })),
+        rooms: roomUsers.map(u => ({ username: u.username, room: u.room }))
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'ERROR',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Route לבדיקת מיקום קבצים (לבדיקה בלבד)
